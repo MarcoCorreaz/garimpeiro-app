@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Garimpeiro do Precinho – automação de promoções</title>
+<meta name="description" content="Aplicativo pessoal que conecta uma planilha do Google Planilhas ao n8n para publicar promoções no canal Garimpeiro do Precinho, no Telegram.">
+<style>
+  :root {
+    --bg: #f3f8f6; --ink: #0d2e2f; --muted: #4b6866; --line: #cfdfda; --accent: #8a5a00; --link: #0b5c52;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0a2527; --ink: #eef4f1; --muted: #a9c0bb; --line: #1f4a49; --accent: #f0c04a; --link: #7fe0cf; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 1.0625rem/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 42rem; margin: 0 auto; padding: 4rem 1.25rem 3rem; }
+  h1 { font-size: clamp(2rem, 6vw, 2.9rem); line-height: 1.12; margin: 0 0 1rem; letter-spacing: -0.02em; }
+  h2 { font-size: 1.25rem; margin: 2.5rem 0 .5rem; }
+  p { margin: 0 0 1rem; }
+  .lead { font-size: 1.2rem; color: var(--muted); }
+  .note { border-left: 3px solid var(--accent); padding-left: 1rem; color: var(--muted); }
+  a { color: var(--link); text-underline-offset: 3px; }
+  a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--line); font-size: .95rem; color: var(--muted); }
+  footer a { margin-right: 1.25rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Garimpeiro do Precinho</h1>
+  <p class="lead">Aplicativo pessoal de automação que publica promoções verificadas no canal do Telegram do mesmo nome.</p>
+
+  <h2>O que o aplicativo faz</h2>
+  <p>O aplicativo conecta uma planilha do Google Planilhas, que pertence ao próprio dono do projeto, a uma instalação do n8n (ferramenta de automação). O n8n lê as ofertas que o dono aprovou na planilha, publica cada uma no canal do Telegram e depois marca na mesma planilha que a oferta foi postada.</p>
+  <p>Para isso, o aplicativo acessa apenas essa planilha: lê as linhas e atualiza as colunas de status e de data de postagem. Ele não acessa e-mails, contatos, fotos nem outros arquivos da conta Google.</p>
+
+  <h2>Quem usa</h2>
+  <p>O uso é restrito ao dono do projeto. O aplicativo não é oferecido ao público e não pede que visitantes entrem com a conta Google.</p>
+
+  <h2>Canal no Telegram</h2>
+  <p>As promoções ficam em <a href="https://t.me/garimpeirodoprecinho">t.me/garimpeirodoprecinho</a>. Os links das ofertas são de afiliado: o dono pode receber comissão se você comprar por eles, sem custo extra para você.</p>
+
+  <p class="note">Os preços mostrados nas ofertas são os vistos no dia da publicação e podem mudar a qualquer momento.</p>
+
+  <footer>
+    <a href="privacidade.html">Política de Privacidade</a>
+    <a href="https://t.me/garimpeirodoprecinho">Canal no Telegram</a>
+  </footer>
+</main>
+</body>
+</html>
