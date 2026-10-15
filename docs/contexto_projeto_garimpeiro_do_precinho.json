@@ -1,0 +1,393 @@
+{
+  "projeto": {
+    "nome": "Garimpeiro do Precinho",
+    "canal_telegram": "https://t.me/garimpeirodoprecinho",
+    "handle_telegram": "@garimpeirodoprecinho",
+    "objetivo_novo_modulo": "Construir um portal/catálogo web de ofertas em tempo real inspirado no Canaltech Ofertas (https://ofertas.canaltech.com.br/), sincronizado automaticamente com a planilha oficial 'Ofertas' no Google Sheets e integrado ao canal do Telegram.",
+    "fuso_horario_operacao": "America/Cuiaba (GMT-4)",
+    "moeda": "BRL (R$)",
+    "plataformas_monitoradas": [
+      "mercadolivre",
+      "amazon",
+      "shopee",
+      "aliexpress"
+    ],
+    "categorias_oficiais": [
+      {
+        "slug": "tecnologia",
+        "label": "Tecnologia",
+        "exemplos": "Smart TVs, Notebooks, Monitores Gamer, Fones Bluetooth, Smartwatches, Periféricos"
+      },
+      {
+        "slug": "casa",
+        "label": "Casa & Cozinha",
+        "exemplos": "Air Fryers, Jogos de Panelas, Aspiradores Verticais, Jogos de Lençol, Eletroportáteis"
+      },
+      {
+        "slug": "utilidades",
+        "label": "Utilidades & Ferramentas",
+        "exemplos": "Robôs Aspiradores, Fechaduras Digitais, Maletas de Ferramentas, Mops, Balanças"
+      },
+      {
+        "slug": "moda",
+        "label": "Moda & Calçados",
+        "exemplos": "Tênis Esportivos, Kits de Camisetas Dry Fit, Kits de Cuecas Lupo, Relógios, Carteiras RFID"
+      }
+    ]
+  },
+  "arquitetura_atual_ecossistema": {
+    "visao_geral": "Pipeline híbrido automatizado composto por 4 camadas: (1) Agente IA Gemini de Garimpo e Auditoria, (2) Ponte Google Apps Script de ingestão via Google Drive, (3) Banco de Dados Central no Google Sheets, e (4) Bot de Disparo no n8n + Portal Web de Catálogo.",
+    "camada_1_agente_curadoria_ia": {
+      "motor": "Gemini Scheduled Actions (Tarefa Agendada)",
+      "horarios_execucao_diaria": [
+        "08:30 (Turno da Manhã: ofertas de abertura, cupons diários e reposição rápida)",
+        "13:30 (Turno da Tarde: ofertas relâmpago e promoções flash)",
+        "19:30 (Turno da Noite: horário nobre, itens de desejo e maior tíquete)"
+      ],
+      "volume_diario": "15 a 20 ofertas por dia (5 a 7 novas ofertas inéditas por turno)",
+      "mix_por_turno": {
+        "achados_de_impulso": "2 itens até R$ 50,00",
+        "intermediarios": "3 itens de R$ 50,00 a R$ 250,00",
+        "itens_de_desejo": "1 a 2 itens acima de R$ 250,00"
+      },
+      "regras_de_qualidade_e_auditoria": [
+        "Auditoria Caça-Erros em todas as linhas antes e depois de cada turno",
+        "Detecção de queda de preço >= 10% nos últimos 7 dias em itens 'postado' -> atualiza preco_anterior, preço_atual, preço_pix e muda status para 'repostar' preservando o link_afiliado",
+        "Limpeza de itens 'pendente' esgotados ou que subiram de preço -> muda status para 'ignorar'",
+        "Trava Anti-Erro de Imagem: exige imagens em alta resolução com sufixo -O.webp ou -F.jpg no Mercado Livre (código de catálogo MLA ou slug descritivo no nome do arquivo) e ._AC_SL1500_.jpg na Amazon, proibindo miniaturas -P",
+        "Consistência matemática rigorosa: o valor em preço_pix deve ser idêntico ao citado na coluna observação e na copy do Telegram"
+      ],
+      "saida_do_turno": "Gera o arquivo temporário '_fila_garimpeiro.json' no Google Drive contendo um array JSON de arrays (20 colunas por oferta)."
+    },
+    "camada_2_ponte_ingestao_apps_script": {
+      "local": "Projeto Google Apps Script independente (script.google.com) com acionador baseado no tempo (a cada 5 a 10 minutos)",
+      "funcao": "importarFilaGarimpeiro()",
+      "logica": "Busca '_fila_garimpeiro.json' no Drive, verifica os 'link_cru' na Coluna M da planilha para evitar duplicatas, atualiza linhas em caso de 'repostar'/'ignorar' ou adiciona novas linhas via appendRow(), e move '_fila_garimpeiro.json' para a lixeira imediatamente."
+    },
+    "camada_3_banco_de_dados_google_sheets": {
+      "nome_planilha": "Ofertas",
+      "spreadsheet_id": "PLACEHOLDER_SPREADSHEET_ID",
+      "nome_aba": "Ofertas",
+      "url_planilha": "https://docs.google.com/spreadsheets/d/PLACEHOLDER_SPREADSHEET_ID/edit",
+      "total_colunas": 20,
+      "total_registros_atuais": 70
+    },
+    "camada_4_aprovacao_e_disparo_n8n": {
+      "fluxo_admin": "O administrador insere o link de afiliado (meli.la, link.amazon, s.shopee.com.br, s.click.aliexpress.com) na Coluna O ('link_afiliado') e altera a Coluna R ('status') de 'pendente' para 'aprovado'.",
+      "fluxo_bot_n8n": "O workflow no n8n monitora a planilha 'Ofertas', filtra linhas com status 'aprovado' ou 'repostar' que possuam 'link_afiliado' preenchido, dispara o card formatado com foto no canal t.me/garimpeirodoprecinho, altera 'status' para 'postado' e grava o timestamp em 'postado_em' (Coluna S)."
+    }
+  },
+  "schema_banco_de_dados_20_colunas": [
+    {
+      "coluna_letra": "A",
+      "indice_zero_based": 0,
+      "campo": "id",
+      "tipo": "string",
+      "descricao": "Identificador interno opcional (geralmente vazio)"
+    },
+    {
+      "coluna_letra": "B",
+      "indice_zero_based": 1,
+      "campo": "data",
+      "tipo": "date (YYYY-MM-DD)",
+      "descricao": "Data da captura ou última queda de preço da oferta"
+    },
+    {
+      "coluna_letra": "C",
+      "indice_zero_based": 2,
+      "campo": "plataforma",
+      "tipo": "enum",
+      "valores_permitidos": [
+        "mercadolivre",
+        "amazon",
+        "shopee",
+        "aliexpress"
+      ],
+      "descricao": "Loja oficial da promoção"
+    },
+    {
+      "coluna_letra": "D",
+      "indice_zero_based": 3,
+      "campo": "produto",
+      "tipo": "string",
+      "descricao": "Título limpo e descritivo do produto (inclui voltagem 110V/220V/Bivolt em eletroportáteis)"
+    },
+    {
+      "coluna_letra": "E",
+      "indice_zero_based": 4,
+      "campo": "categoria",
+      "tipo": "enum",
+      "valores_permitidos": [
+        "tecnologia",
+        "moda",
+        "casa",
+        "utilidades"
+      ],
+      "descricao": "Categoria oficial para filtros e abas do site"
+    },
+    {
+      "coluna_letra": "F",
+      "indice_zero_based": 5,
+      "campo": "preço_atual",
+      "tipo": "number (float)",
+      "descricao": "Menor preço vigente em reais com ponto decimal (ex: 168.80) - mantido para compatibilidade com o n8n"
+    },
+    {
+      "coluna_letra": "G",
+      "indice_zero_based": 6,
+      "campo": "preço_pix",
+      "tipo": "number (float)",
+      "descricao": "Valor final à vista no Pix já com desconto de cupom aplicado (ex: 168.80)"
+    },
+    {
+      "coluna_letra": "H",
+      "indice_zero_based": 7,
+      "campo": "preço_parcelado",
+      "tipo": "string",
+      "descricao": "Condição de parcelamento sem juros no cartão (ex: '10x de R$ 62,90 sem juros')"
+    },
+    {
+      "coluna_letra": "I",
+      "indice_zero_based": 8,
+      "campo": "cupom",
+      "tipo": "string",
+      "descricao": "Código exato do cupom aplicável para copiar com 1 clique (ex: 'MELI10', ou vazio quando o desconto é direto)"
+    },
+    {
+      "coluna_letra": "J",
+      "indice_zero_based": 9,
+      "campo": "preco_anterior",
+      "tipo": "number (float) | empty",
+      "descricao": "Preço em que foi postado anteriormente (preenchido quando há nova queda para 'repostar')"
+    },
+    {
+      "coluna_letra": "K",
+      "indice_zero_based": 10,
+      "campo": "preço_original",
+      "tipo": "number (float)",
+      "descricao": "Preço 'De' riscado de referência (ex: 249.90)"
+    },
+    {
+      "coluna_letra": "L",
+      "indice_zero_based": 11,
+      "campo": "desconto_pct",
+      "tipo": "string",
+      "descricao": "Percentual de desconto exibido no badge do card (ex: '35%')"
+    },
+    {
+      "coluna_letra": "M",
+      "indice_zero_based": 12,
+      "campo": "link_cru",
+      "tipo": "url",
+      "descricao": "URL limpa direta do produto na loja (usada como chave única de deduplicação)"
+    },
+    {
+      "coluna_letra": "N",
+      "indice_zero_based": 13,
+      "campo": "imagem_url",
+      "tipo": "url",
+      "descricao": "URL direta da foto oficial do produto em alta resolução (.webp ou .jpg)"
+    },
+    {
+      "coluna_letra": "O",
+      "indice_zero_based": 14,
+      "campo": "link_afiliado",
+      "tipo": "url",
+      "descricao": "Link monetizado de afiliado (ex: https://meli.la/..., https://link.amazon/...) que deve ser usado no botão 'Ir para a Loja' do site"
+    },
+    {
+      "coluna_letra": "P",
+      "indice_zero_based": 15,
+      "campo": "fonte",
+      "tipo": "url",
+      "descricao": "URL da vitrine ou página de origem do garimpo"
+    },
+    {
+      "coluna_letra": "Q",
+      "indice_zero_based": 16,
+      "campo": "observação",
+      "tipo": "string",
+      "descricao": "Resumo persuasivo de 1 frase com prova social (vendas/nota), diferencial técnico e confirmação do valor Pix/parcelado"
+    },
+    {
+      "coluna_letra": "R",
+      "indice_zero_based": 17,
+      "campo": "status",
+      "tipo": "enum",
+      "valores_permitidos": [
+        "pendente",
+        "aprovado",
+        "postado",
+        "repostar",
+        "ignorar"
+      ],
+      "descricao": "Status operacional. O site público deve exibir apenas itens com status 'postado', 'aprovado' ou 'repostar' que tenham 'link_afiliado' preenchido."
+    },
+    {
+      "coluna_letra": "S",
+      "indice_zero_based": 18,
+      "campo": "postado_em",
+      "tipo": "datetime string",
+      "descricao": "Data e hora em que o n8n publicou a oferta no Telegram (ex: '14/10/2026 10:20:00')"
+    },
+    {
+      "coluna_letra": "T",
+      "indice_zero_based": 19,
+      "campo": "verificado_em",
+      "tipo": "datetime string",
+      "descricao": "Data e hora da última auditoria da IA (ex: '2026-10-15 08:48')"
+    }
+  ],
+  "especificacao_portal_web_catalogo": {
+    "referencia_visual_e_ux": "https://ofertas.canaltech.com.br/",
+    "regras_de_exibicao_de_produtos": {
+      "filtro_seguranca_afiliado": "Exibir no site público EXCLUSIVAMENTE linhas onde 'link_afiliado' (Coluna O) NÃO esteja vazio E 'status' (Coluna R) seja 'postado', 'aprovado' ou 'repostar' (nunca exibir itens com status 'ignorar' ou sem link de afiliado).",
+      "ordenacao_padrao": "Mais recentes primeiro (ordenar por 'postado_em' ou 'data'/'verificado_em' decrescente, ou da última linha para a primeira)."
+    },
+    "componentes_principais_da_interface": {
+      "header_fixo": [
+        "Logo e identidade visual 'Garimpeiro do Precinho'",
+        "Barra de busca instantânea por nome do produto, marca ou loja",
+        "Botão de destaque CTA 'Entrar no Canal do Telegram' (https://t.me/garimpeirodoprecinho) para captura de leads"
+      ],
+      "barra_de_filtros_e_categorias": [
+        "Abas rápidas por Categoria: Todas, Tecnologia, Casa, Utilidades, Moda",
+        "Filtro por Loja (chips com ícone/cor): Mercado Livre, Amazon, Shopee, AliExpress",
+        "Filtro por Faixa de Preço: Achados até R$ 50 (Impulso), R$ 50 a R$ 250, Acima de R$ 250, Com Cupom Ativo",
+        "Ordenação: Mais Recentes, Maior Desconto (%), Menor Preço"
+      ],
+      "card_de_oferta_estilo_canaltech": [
+        "Badge superior de Loja (Mercado Livre / Amazon / Shopee / AliExpress) + tempo relativo (ex: 'Postado há 2h')",
+        "Badge de Desconto em destaque (ex: '-35% OFF') ou selo 'Menor Preço / Queda de Preço' quando status == 'repostar'",
+        "Imagem do produto centralizada com fundo branco limpo (carregada de 'imagem_url' com lazy loading)",
+        "Título do produto ('produto') limitado a 2 linhas com ellipsis",
+        "Resumo técnico curto ('observação') em fonte secundária",
+        "Bloco de Preços: Preço original riscado ('preço_original'), Preço principal grande em destaque ('preço_pix' com selo 'no Pix'), e linha secundária com 'preço_parcelado'",
+        "Componente de Cupom Interativo (se a coluna 'cupom' estiver preenchida): botão pontilhado com o código do cupom que copia para a área de transferência ao clicar ('Cupom copiado!')",
+        "Botão principal de conversão ('Pegar Oferta' / 'Ir para a Loja') abrindo 'link_afiliado' em nova aba (target='_blank' rel='noopener sponsored')"
+      ],
+      "aviso_legal_rodape": "Texto padrão de transparência de afiliados: 'Os preços e estoques podem sofrer alterações a qualquer momento pelas lojas parceiras. Comprando pelos links do Garimpeiro do Precinho podemos receber uma comissão sem custo adicional para você.'"
+    },
+    "opcoes_de_integracao_backend_com_a_planilha": {
+      "opcao_1_api_json_via_apps_script_recomendada": "Adicionar uma função doGet(e) no mesmo Google Apps Script que já criamos e implantar como 'Web App' (acesso: Qualquer pessoa). Ele retorna um JSON limpo e cacheado apenas com os produtos aprovados/postados que têm link_afiliado, sem expor a planilha inteira.",
+      "opcao_2_leitura_direta_google_sheets_csv_gviz": "Consumir o endpoint público de leitura da planilha (Google Visualization API ou export CSV: https://docs.google.com/spreadsheets/d/PLACEHOLDER_SPREADSHEET_ID/gviz/tq?tqx=out:json&sheet=Ofertas) diretamente no frontend ou via Next.js/Vercel ISR com revalidate de 60 segundos.",
+      "opcao_3_webhook_n8n": "O próprio workflow do n8n, no momento em que posta no Telegram, também envia um POST para o banco de dados do site (Supabase / Firebase / Postgres) ou revalida o cache do site."
+    }
+  },
+  "amostra_dados_reais_da_planilha": {
+    "ofertas_postadas_com_link_afiliado": [
+      {
+        "id": "",
+        "data": "2026-10-14",
+        "plataforma": "mercadolivre",
+        "produto": "Caixa De Som JBL Go 3 Portátil Bluetooth 4.2W À Prova D'água IP67",
+        "categoria": "tecnologia",
+        "preço_atual": "229.00",
+        "preço_pix": "229.00",
+        "preço_parcelado": "4x de R$ 57,25 sem juros",
+        "cupom": "",
+        "preco_anterior": "",
+        "preço_original": "349.00",
+        "desconto_pct": "34%",
+        "link_cru": "https://www.mercadolivre.com.br/caixa-de-som-jbl-go-3-portatil-bluetooth-42w-prova-dagua-e-poeira-cor-preto/p/MLB16247313",
+        "imagem_url": "https://http2.mlstatic.com/D_NQ_NP_822343-MLA99964571593_112025-O.webp",
+        "link_afiliado": "https://meli.la/1bZE3b4",
+        "fonte": "https://www.mercadolivre.com.br/mais-vendidos",
+        "observação": "Mais de 50 mil avaliações 4.8 e proteção IP67: R$ 229,00 no Pix ou 4x sem juros de R$ 57,25.",
+        "status": "postado",
+        "postado_em": "14/10/2026 12:50:00",
+        "verificado_em": "2026-10-14 09:14"
+      },
+      {
+        "id": "",
+        "data": "2026-10-14",
+        "plataforma": "mercadolivre",
+        "produto": "Mop Giratório Pró Flash Limp Balde 9L com Centrífuga e 2 Refis",
+        "categoria": "utilidades",
+        "preço_atual": "74.90",
+        "preço_pix": "74.90",
+        "preço_parcelado": "8x de R$ 9,36 sem juros",
+        "cupom": "",
+        "preco_anterior": "",
+        "preço_original": "99.90",
+        "desconto_pct": "25%",
+        "link_cru": "https://www.mercadolivre.com.br/mop-giratorio-pro-com-2-refis-9-litros-flash-limp-verde/p/MLB19548223",
+        "imagem_url": "https://http2.mlstatic.com/D_NQ_NP_756440-MLA115067576235_072026-O.webp",
+        "link_afiliado": "https://meli.la/14zdyXx",
+        "fonte": "https://www.mercadolivre.com.br/mais-vendidos",
+        "observação": "Top 1 Mais Vendido em limpeza com 2 refis microfibra: R$ 74,90 no Pix ou 8x sem juros de R$ 9,36.",
+        "status": "postado",
+        "postado_em": "14/10/2026 13:00:00",
+        "verificado_em": "2026-10-14 09:14"
+      },
+      {
+        "id": "",
+        "data": "2026-10-14",
+        "plataforma": "mercadolivre",
+        "produto": "Jogo de Facas Tramontina Plenus Lâminas Inox com Cepo de Madeira 6 Peças",
+        "categoria": "casa",
+        "preço_atual": "69.90",
+        "preço_pix": "69.90",
+        "preço_parcelado": "3x de R$ 23,30 sem juros",
+        "cupom": "",
+        "preco_anterior": "",
+        "preço_original": "99.90",
+        "desconto_pct": "30%",
+        "link_cru": "https://www.mercadolivre.com.br/tramontina-jogo-de-facas-plenus-com-6-pecas-em-aco-inox-e-suporte-de-madeira/p/MLB27490685",
+        "imagem_url": "https://http2.mlstatic.com/D_NQ_NP_803306-MLA99943515623_112025-O.webp",
+        "link_afiliado": "https://meli.la/19zh1AX",
+        "fonte": "https://www.mercadolivre.com.br/ofertas",
+        "observação": "Lâminas inox com tratamento térmico e cepo de madeira: R$ 69,90 no Pix ou 3x sem juros de R$ 23,30.",
+        "status": "postado",
+        "postado_em": "14/10/2026 13:10:00",
+        "verificado_em": "2026-10-14 09:14"
+      }
+    ],
+    "ofertas_recem_importadas_pela_ponte": [
+      {
+        "id": "",
+        "data": "2026-10-15",
+        "plataforma": "mercadolivre",
+        "produto": "Jogo de Panelas Tramontina Turim 5 Peças Antiaderente Starflon Max Preto",
+        "categoria": "casa",
+        "preço_atual": "169.90",
+        "preço_pix": "169.90",
+        "preço_parcelado": "5x de R$ 33,98 sem juros",
+        "cupom": "",
+        "preco_anterior": "",
+        "preço_original": "229.90",
+        "desconto_pct": "26%",
+        "link_cru": "https://www.mercadolivre.com.br/jogo-panelas-preto-5-pc-tramontina-turim-20298061/p/MLB33321507",
+        "imagem_url": "https://http2.mlstatic.com/D_NQ_NP_769549-MLA96416865462_102025-O.webp",
+        "link_afiliado": "",
+        "fonte": "https://www.mercadolivre.com.br/mais-vendidos",
+        "observação": "Revestimento antiaderente Starflon Max interno e externo com tampas de vidro temperado: R$ 169,90 no Pix ou 5x de R$ 33,98 sem juros.",
+        "status": "pendente",
+        "postado_em": "",
+        "verificado_em": "2026-10-15 08:48"
+      },
+      {
+        "id": "",
+        "data": "2026-10-15",
+        "plataforma": "mercadolivre",
+        "produto": "Caixa de Som JBL Flip 6 Portátil Bluetooth 30W RMS IP67 Preto Bivolt",
+        "categoria": "tecnologia",
+        "preço_atual": "629.00",
+        "preço_pix": "629.00",
+        "preço_parcelado": "10x de R$ 62,90 sem juros",
+        "cupom": "",
+        "preco_anterior": "",
+        "preço_original": "849.00",
+        "desconto_pct": "26%",
+        "link_cru": "https://www.mercadolivre.com.br/caixa-de-som-jbl-flip-6-portatil-bluetooth-prova-dagua-preto/p/MLB24531100",
+        "imagem_url": "https://http2.mlstatic.com/D_NQ_NP_790613-MLA96103274327_102025-O.webp",
+        "link_afiliado": "",
+        "fonte": "https://www.mercadolivre.com.br/ofertas",
+        "observação": "Sistema de 2 vias com 30W RMS, proteção IP67 contra água e poeira e até 12h de bateria: R$ 629,00 no Pix ou 10x de R$ 62,90 sem juros.",
+        "status": "pendente",
+        "postado_em": "",
+        "verificado_em": "2026-10-15 08:48"
+      }
+    ]
+  }
+}
